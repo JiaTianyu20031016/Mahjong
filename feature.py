@@ -11,19 +11,23 @@ except:
 class FeatureAgent(MahjongGBAgent):
     
     '''
-    observation: 6*4*9
-        (men+quan+hand4)*4*9
+    observation: 13*4*9
+        (men+quan+hand1+pack4+shown1+history4+card1)*4*9
     action_mask: 235
         pass1+hu1+discard34+chi63(3*7*3)+peng34+gang34+angang34+bugang34
     '''
     
-    OBS_SIZE = 6
+    OBS_SIZE = 13
     ACT_SIZE = 235
     
     OFFSET_OBS = {
         'SEAT_WIND' : 0,
         'PREVALENT_WIND' : 1,
-        'HAND' : 2
+        'HAND' : 2,
+        'PACK' : 3,
+        'SHOWN' : 7,
+        'HISTORY': 8,
+        'CURRENT': 12
     }
     OFFSET_ACT = {
         'Pass' : 0,
@@ -84,7 +88,6 @@ class FeatureAgent(MahjongGBAgent):
             return
         if t[0] == 'Deal':
             self.hand = t[1:]
-            self._hand_embedding_update()
             return
         if t[0] == 'Huang':
             self.valid = []
@@ -99,7 +102,6 @@ class FeatureAgent(MahjongGBAgent):
                 self.valid.append(self.OFFSET_ACT['Hu'])
             self.isAboutKong = False
             self.hand.append(tile)
-            self._hand_embedding_update()
             for tile in set(self.hand):
                 self.valid.append(self.OFFSET_ACT['Play'] + self.OFFSET_TILE[tile])
                 if self.hand.count(tile) == 4 and not self.wallLast and self.tileWall[0] > 0:
@@ -128,7 +130,6 @@ class FeatureAgent(MahjongGBAgent):
             self.history[p].append(self.curTile)
             if p == 0:
                 self.hand.remove(self.curTile)
-                self._hand_embedding_update()
                 return
             else:
                 # Available: Hu/Gang/Peng/Chi/Pass
@@ -168,7 +169,6 @@ class FeatureAgent(MahjongGBAgent):
                 self.hand.append(self.curTile)
                 for i in range(-1, 2):
                     self.hand.remove(color + str(num + i))
-                self._hand_embedding_update()
                 for tile in set(self.hand):
                     self.valid.append(self.OFFSET_ACT['Play'] + self.OFFSET_TILE[tile])
                 return self._obs()
@@ -186,7 +186,6 @@ class FeatureAgent(MahjongGBAgent):
                 for i in range(-1, 2):
                     self.hand.append(color + str(num + i))
                 self.hand.remove(self.curTile)
-                self._hand_embedding_update()
             return
         if t[2] == 'Peng':
             self.packs[p].append(('PENG', self.curTile, (4 + p - self.tileFrom) % 4))
@@ -197,7 +196,6 @@ class FeatureAgent(MahjongGBAgent):
                 self.valid = []
                 for i in range(2):
                     self.hand.remove(self.curTile)
-                self._hand_embedding_update()
                 for tile in set(self.hand):
                     self.valid.append(self.OFFSET_ACT['Play'] + self.OFFSET_TILE[tile])
                 return self._obs()
@@ -209,7 +207,6 @@ class FeatureAgent(MahjongGBAgent):
             if p == 0:
                 for i in range(2):
                     self.hand.append(self.curTile)
-                self._hand_embedding_update()
             return
         if t[2] == 'Gang':
             self.packs[p].append(('GANG', self.curTile, (4 + p - self.tileFrom) % 4))
@@ -217,7 +214,6 @@ class FeatureAgent(MahjongGBAgent):
             if p == 0:
                 for i in range(3):
                     self.hand.remove(self.curTile)
-                self._hand_embedding_update()
                 self.isAboutKong = True
             return
         if t[2] == 'AnGang':
@@ -239,7 +235,6 @@ class FeatureAgent(MahjongGBAgent):
             self.shownTiles[tile] += 1
             if p == 0:
                 self.hand.remove(tile)
-                self._hand_embedding_update()
                 self.isAboutKong = True
                 return
             else:
@@ -302,6 +297,9 @@ class FeatureAgent(MahjongGBAgent):
         return self.OFFSET_ACT['Pass']
     
     def _obs(self):
+        # update obs before sending it to agent
+        self._maintain_obs()
+        
         mask = np.zeros(self.ACT_SIZE)
         for a in self.valid:
             mask[a] = 1
@@ -311,13 +309,37 @@ class FeatureAgent(MahjongGBAgent):
         }
     
     def _hand_embedding_update(self):
+       return
+     
+    def _maintain_obs(self):
+        # clean up
         self.obs[self.OFFSET_OBS['HAND'] : ] = 0
-        d = defaultdict(int)
+        
         for tile in self.hand:
-            d[tile] += 1
-        for tile in d:
-            self.obs[self.OFFSET_OBS['HAND'] : self.OFFSET_OBS['HAND'] + d[tile], self.OFFSET_TILE[tile]] = 1
-    
+            self.obs[self.OFFSET_OBS['HAND']][self.OFFSET_TILE[tile]] += 1
+        
+        for tile in self.shownTiles:
+            self.obs[self.OFFSET_OBS['SHOWN']][self.OFFSET_TILE[tile]] += 1
+        
+        self.obs[self.OFFSET_OBS['CURRENT']][self.OFFSET_TILE[self.curTile]] = 1
+
+        for p in range(4):
+            for tile in self.history[p]:
+                self.obs[self.OFFSET_OBS['HISTORY'] + p][self.OFFSET_TILE[tile]] += 1
+        
+        for p in range(4):
+             for packType, tile, offer in self.packs[p]:
+                if packType == 'PENG':
+                    self.obs[self.OFFSET_OBS['PACK'] + p][self.OFFSET_TILE[tile]] += 3
+                elif packType == 'GANG' and tile != 'CONCEALED':
+                    self.obs[self.OFFSET_OBS['PACK'] + p][self.OFFSET_TILE[tile]] += 4
+                elif packType == 'CHI':
+                    color = tile[0]
+                    num = int(tile[1])
+                    for i in range(-1, 2):
+                        self.obs[self.OFFSET_OBS['PACK'] + p][self.OFFSET_TILE[color + str(num + i)]] += 1
+        
+           
     def _check_mahjong(self, winTile, isSelfDrawn = False, isAboutKong = False):
         try:
             fans = MahjongFanCalculator(

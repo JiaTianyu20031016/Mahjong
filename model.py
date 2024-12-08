@@ -6,7 +6,7 @@ class CNNModel(nn.Module):
     def __init__(self):
         nn.Module.__init__(self)
         self._tower = nn.Sequential(
-            nn.Conv2d(6, 64, 3, 1, 1, bias = False),
+            nn.Conv2d(13, 64, 3, 1, 1, bias = False),
             nn.ReLU(True),
             nn.Conv2d(64, 64, 3, 1, 1, bias = False),
             nn.ReLU(True),
