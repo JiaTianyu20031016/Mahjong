@@ -8,19 +8,27 @@ class CNNModel(nn.Module):
         self._tower = nn.Sequential(
             nn.Conv2d(13, 64, 3, 1, 1, bias = False),
             nn.ReLU(True),
-            nn.Conv2d(64, 64, 3, 1, 1, bias = False),
+            nn.Conv2d(64, 128, 3, 1, 1, bias = False),
+            nn.ReLU(True),
+            nn.Conv2d(128, 64, 3, 1, 1, bias = False),
             nn.ReLU(True),
             nn.Conv2d(64, 32, 3, 1, 1, bias = False),
             nn.ReLU(True),
             nn.Flatten()
         )
         self._logits = nn.Sequential(
-            nn.Linear(32 * 4 * 9, 256),
+            nn.Linear(32 * 4 * 9, 512),
             nn.ReLU(True),
-            nn.Linear(256, 235)
+            nn.Linear(512, 1024),
+            nn.ReLU(True),
+            nn.Linear(1024, 512),
+            nn.ReLU(True),
+            nn.Linear(512, 235)
         )
         self._value_branch = nn.Sequential(
-            nn.Linear(32 * 4 * 9, 256),
+            nn.Linear(32 * 4 * 9, 512),
+            nn.ReLU(True),
+            nn.Linear(512, 256),
             nn.ReLU(True),
             nn.Linear(256, 1)
         )

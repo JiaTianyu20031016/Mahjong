@@ -118,6 +118,8 @@ class MahjongGBEnv():
                                 # A draw
                                 self.obs = {i : self.agents[i].request2obs('Huang') for i in range(4)}
                                 self.reward = [0, 0, 0, 0]
+                                # punish Huang
+                                self.reward[(self.curPlayer + 1) % 4] = -10
                                 self.done = True
                             else:
                                 # Next player

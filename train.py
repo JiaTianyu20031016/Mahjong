@@ -12,19 +12,19 @@ if __name__ == '__main__':
         'model_pool_size': 20,
         'model_pool_name': 'model-pool',
         'num_actors': 24,
-        'episodes_per_actor': 1000,
+        'episodes_per_actor': 100000,
         'gamma': 0.98,
         'lambda': 0.95,
         'min_sample': 200,
-        'batch_size': 256,
+        'batch_size': 512,
         'epochs': 5,
         'clip': 0.2,
         'lr': 1e-4,
         'value_coeff': 1,
         'entropy_coeff': 0.01,
         'device': 'cuda',
-        'ckpt_save_interval': 300,
-        'ckpt_save_path': '/root/jiaty/Mahjong-RL-botzone/framework/checkpoint/'
+        'ckpt_save_interval': 3000,
+        'ckpt_save_path': '/root/jiaty/Mahjong-RL-botzone/checkpoint/'
     }
     
     replay_buffer = ReplayBuffer(config['replay_buffer_size'], config['replay_buffer_episode'])

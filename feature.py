@@ -91,6 +91,7 @@ class FeatureAgent(MahjongGBAgent):
             return
         if t[0] == 'Huang':
             self.valid = []
+            #print("Huang !" + "-"*50)
             return self._obs()
         if t[0] == 'Draw':
             # Available: Hu, Play, AnGang, BuGang
@@ -273,7 +274,7 @@ class FeatureAgent(MahjongGBAgent):
         if action < self.OFFSET_ACT['BuGang']:
             return 'Gang ' + self.TILE_LIST[action - self.OFFSET_ACT['AnGang']]
         return 'BuGang ' + self.TILE_LIST[action - self.OFFSET_ACT['BuGang']]
-    
+
     '''
     Pass
     Hu
@@ -321,7 +322,10 @@ class FeatureAgent(MahjongGBAgent):
         for tile in self.shownTiles:
             self.obs[self.OFFSET_OBS['SHOWN']][self.OFFSET_TILE[tile]] += 1
         
-        self.obs[self.OFFSET_OBS['CURRENT']][self.OFFSET_TILE[self.curTile]] = 1
+        try:
+            self.obs[self.OFFSET_OBS['CURRENT']][self.OFFSET_TILE[self.curTile]] = 1
+        except:
+            pass
 
         for p in range(4):
             for tile in self.history[p]:
