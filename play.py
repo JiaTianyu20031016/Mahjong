@@ -14,7 +14,7 @@ model = CNNModel()
     
 # load initial model
 
-state_dict = torch.load('/root/jiaty/Mahjong-RL-botzone/framework/checkpoint/model_60528.pt')
+state_dict = torch.load('/root/jiaty/Mahjong-RL-botzone/checkpoint/model_717877.pt')
 model.load_state_dict(state_dict)
 
 # collect data

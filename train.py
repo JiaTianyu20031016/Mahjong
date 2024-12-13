@@ -24,7 +24,7 @@ if __name__ == '__main__':
         'entropy_coeff': 0.01,
         'device': 'cuda',
         'ckpt_save_interval': 3000,
-        'ckpt_save_path': '/root/jiaty/Mahjong-RL-botzone/checkpoint/'
+        'ckpt_save_path': '/root/jiaty/Mahjong-RL-botzone/checkpoint/nofan_nopunish/'
     }
     
     replay_buffer = ReplayBuffer(config['replay_buffer_size'], config['replay_buffer_episode'])

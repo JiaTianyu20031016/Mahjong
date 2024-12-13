@@ -17,13 +17,13 @@ class CNNModel(nn.Module):
             nn.Flatten()
         )
         self._logits = nn.Sequential(
-            nn.Linear(32 * 4 * 9, 512),
+            nn.Linear(32 * 4 * 9, 256),
             nn.ReLU(True),
-            nn.Linear(512, 1024),
+            nn.Linear(256, 512),
             nn.ReLU(True),
-            nn.Linear(1024, 512),
+            nn.Linear(512, 256),
             nn.ReLU(True),
-            nn.Linear(512, 235)
+            nn.Linear(256, 36)
         )
         self._value_branch = nn.Sequential(
             nn.Linear(32 * 4 * 9, 256),

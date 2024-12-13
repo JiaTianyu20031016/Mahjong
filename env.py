@@ -117,9 +117,9 @@ class MahjongGBEnv():
                             if self.wallLast:
                                 # A draw
                                 self.obs = {i : self.agents[i].request2obs('Huang') for i in range(4)}
-                                self.reward = [10, 10, 10, 10]
+                                self.reward = [0, 0, 0, 0]
                                 # punish Huang
-                                self.reward[(self.curPlayer + 1) % 4] = -30
+                                # self.reward[(self.curPlayer + 1) % 4] = -30
                                 self.done = True
                             else:
                                 # Next player
@@ -304,7 +304,7 @@ class MahjongGBEnv():
             fanCnt = 0
             for fanPoint, cnt, fanName, fanNameEn in fans:
                 fanCnt += fanPoint * cnt
-            if fanCnt < 8: raise Error('Not Enough Fans')
+            if fanCnt < 1: raise Error('Not Enough Fans')
             self.obs = {i : self.agents[i].request2obs('Player %d Hu' % player) for i in range(4)}
             if isSelfDrawn:
                 self.reward = [-(8 + fanCnt)] * 4
