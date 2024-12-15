@@ -6,19 +6,20 @@ from replay_buffer import ReplayBuffer
 from model_pool import ModelPoolClient
 from env import MahjongGBEnv
 from feature import FeatureAgent
-from model import CNNModel
+from myagent import SimpleAgent
+from model import CNNModel, simpleModel
 
 
 
-model = CNNModel()
+model = simpleModel()
     
 # load initial model
 
-state_dict = torch.load('/root/jiaty/Mahjong-RL-botzone/checkpoint/model_717877.pt')
+state_dict = torch.load('/home/jiaty/Mahjong-RL-botzone/checkpoint/nofan_nopunish/model_367132.pt')
 model.load_state_dict(state_dict)
 
 # collect data
-env = MahjongGBEnv(config = {'agent_clz': FeatureAgent})
+env = MahjongGBEnv(config = {'agent_clz': SimpleAgent})
 policies = {player : model for player in env.agent_names} # all four players use the latest model
 
 obs = env.reset()
