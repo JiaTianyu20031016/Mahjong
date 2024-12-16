@@ -94,7 +94,7 @@ class Actor(Process):
                     episode_data[agent_name]['reward'].append(rewards[agent_name])
                 obs = next_obs
                 n_step += 1
-            print(self.name, 'pos', new_player, 'Episode', episode, 'Model', latest['id'], 'Reward', rewards[new_player], 'Step', n_step)
+            # print(self.name, 'pos', new_player, 'Episode', episode, 'Model', latest['id'], 'Reward', rewards[new_player], 'Step', n_step)
             if invalid: 
                 print ("actor: model error")
                 continue 

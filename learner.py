@@ -58,8 +58,6 @@ class Learner(Process):
             advs = torch.tensor(batch['adv']).to(device)
             targets = torch.tensor(batch['target']).to(device)
 
-            
-
             # calculate PPO loss
             model.train(True)  # Batch Norm training mode
             old_logits, _ = model(states)

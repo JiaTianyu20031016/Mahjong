@@ -1,2 +1,6 @@
 /checkpoint
 /__pycache__
+/data
+/model
+/raw_data
+/supervise_data

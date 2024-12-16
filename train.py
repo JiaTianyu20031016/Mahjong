@@ -27,7 +27,7 @@ if __name__ == '__main__':
         'device': 'cuda',
         'learner-device': 'cuda',
         'actor-device': 'cuda',
-        'ckpt_save_interval': 5,
+        'ckpt_save_interval': 50,
         'ckpt_save_path': 'model/checkpoint'
     }
 
