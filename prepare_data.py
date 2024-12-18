@@ -10,28 +10,42 @@ import os
 
 
 l = []
-
-data_path = '/root/jiaty/Mahjong-RL-botzone/framework/data'
-save_path = '/root/jiaty/Mahjong-RL-botzone/framework/supervise_data'
+errcnt = 0
+data_path = '/data/jiaty/mahjong/data/'
+save_path = '/data/jiaty/mahjong/supervise_data/'
 
 
 def filterData(obs, actions):
+    global errcnt
     newobs = [[] for i in range(4)]
     newactions = [[] for i in range(4)]
     for i in range(4):
         for j, o in enumerate(obs[i]):
             if o['action_mask'].sum() > 1:  # ignore states with single valid action (Pass)
-                newobs[i].append(o)
-                newactions[i].append(actions[i][j])
+                if o['action_mask'][actions[i][j]] == 1:
+                    newobs[i].append(o)
+                    newactions[i].append(actions[i][j])
+                else:
+                    errcnt += 1
     return newobs, newactions
 
 
 def saveData(obs, actions, winner, path):
     assert [len(x) for x in obs] == [len(x) for x in actions], 'obs actions not matching!'
+    for i in range(4):
+        if len(obs[i]) == 0:
+            continue
+        m = np.stack([o['action_mask'] for o in obs[i]])
+        a = actions[i]
+        x_idx = list(range(m.shape[0]))
+        y_idx = list(a)
+        assert np.all(m[x_idx, y_idx]), 'invalid action detected!'
+    
     l.append(
         {
             "file": path,
             "sample_num": sum([len(x) for x in obs]),
+            "winner_sample_num": len(obs[winner]),
             "winner": winner
         }
     )
@@ -162,6 +176,7 @@ if __name__ == '__main__':
         print(file)
         process(file, os.path.join(save_path, file.replace('.txt', '.npz')))
 
-
+    print(f"Err cnt: {errcnt}")
+    
     with open(os.path.join(save_path, 'meta.json'), 'w') as f:
         json.dump(l, f)

@@ -9,7 +9,6 @@ from torch import nn
 
 from env import MahjongGBEnv
 from feature import FeatureAgent
-from model_pool import ModelPoolClient
 
 
 class BasicBlock(nn.Module):
@@ -60,15 +59,13 @@ class BasicBlock(nn.Module):
 
 class CNNModel(nn.Module):
 
-    def __init__(self, verbose=False):
-        self.verbose = verbose
+    def __init__(self):
         nn.Module.__init__(self)
         self._embed = nn.Linear(4 * 9, 64)
 
         self._block1 = BasicBlock(FeatureAgent.OBS_SIZE, 256, 1)
         self._block2 = BasicBlock(256, 256, 1)
         self._conv3 = nn.Conv2d(256, 32, 3, 1, 1)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         self._logits = nn.Sequential(
             nn.Linear(32*8*8, 256),
@@ -94,32 +91,19 @@ class CNNModel(nn.Module):
         hidden = self._block1(embed)  # (batch, obs_size, 8, 8) -> (batch, 256, 4, 4)
         hidden = self._block2(hidden)  # (batch, 256, 4, 4) -> (batch, 512, 2, 2)
         hidden = self._conv3(hidden)
-        # hidden = self.avgpool(hidden)  # (batch, 512, 2, 2) -> (batch, 512, 1, 1)
-        # hidden = torch.squeeze(hidden)  # (batch, 512,)
         hidden = hidden.flatten(1)
 
         logits = self._logits(hidden)
         mask = input_dict["action_mask"].float()
-        # if self.verbose:
-        #     print("mask", mask)
         inf_mask = torch.clamp(torch.log(mask), -1e38, 1e38)
-        # if self.verbose:
-        #     print("inf_mask", inf_mask)
         masked_logits = logits + inf_mask
-        # if self.verbose:
-        #     print("masked_logits", masked_logits)
         value = self._value_branch(hidden)
         return masked_logits, value
 
 
-'''
-model with version v and score s is stored at model_dir/model_{v}.pt
-'''
-
 
 class ModelManager:
-    def __init__(self, model_dir='model/checkpoint', verbose=False):
-        self.verbose = verbose
+    def __init__(self, model_dir='model/checkpoint'):
         self.model_dir = model_dir
         
     def get_model(self, name = '') -> CNNModel:
@@ -214,8 +198,6 @@ class ModelManager:
         policies = {f'player_{i+1}': CNNModel() for i in range(4)}
         candidates = [candidate1, candidate2, candidate3, candidate4]
 
-        if self.verbose:
-            print(f"comparing {candidate1} {candidate2} {candidate3} {candidate4}")
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         for player, candidate in zip(policies, candidates):
             policies[player].load_state_dict(
@@ -223,13 +205,15 @@ class ModelManager:
             policies[player].train(False)  # Batch Norm inference mode
             policies[player].to(device)
         
-        rewards = self._compare_models(policies, n_episode, 0)
+        rewards = self._compare_models(policies, n_episode)
 
         results = {k: [candidate, rewards[f'player_{k+1}']] for k, candidate in enumerate(candidates)}
 
         return results
     
+    
     def compare_baseline_latest(self, model_pool_name):
+        from model_pool import ModelPoolClient
         model_pool = ModelPoolClient(model_pool_name)
         win = True
         overall_rank = 0
@@ -247,21 +231,15 @@ class ModelManager:
             results = self._compare_models(policies, 10)
             rank = 0
             for player in policies:
-                if player != new_player and results[player] > results[new_player]:
+                if player != new_player and results[player] >= results[new_player]:
                     rank += 1
-            baseline_rewards = max([results[player] for player in policies if player != new_player])
-            our_reward = results[new_player]
             print('reward', results, new_player, 'our_rank', rank)
             overall_rank += rank + 1
         overall_rank /= 5
         return overall_rank <= 2.1
     
-    def _compare_models(self, policies, n_episode=10, idx = 0) -> Dict[str, int]:
-        """Compare four models by playing mahjong for n_episode rounds.
-        Return the accumulated reward for each player.
-            results =
-                {0: [candidate1, reward1], 1: [candidate2, reward2], 2: [candidate3, reward3], 3: [candidate4, reward4]}
-        """
+    
+    def _compare_models(self, policies, n_episode=10) -> Dict[str, int]:
         env = MahjongGBEnv(config={'agent_clz': FeatureAgent})
         results = {name: 0 for name in env.agent_names}
         
@@ -296,42 +274,26 @@ class ModelManager:
 
             for player in rewards:
                 results[player] += rewards[player]
-            if self.verbose:
-                print(f'Episode {episode}: n_step = {n_step}, rewards = {rewards}')
+                
         for k in results:
             results[k] /= n_episode
         return results    
 
-    def get_latest_model(self, *args, **kwargs) -> Tuple[CNNModel, int]:
-        model = CNNModel(*args, **kwargs)
-        latest_version = -1
-        for file in os.listdir(self.model_dir):
-            if 'model' in file:
-                version = int(file.split('.')[0].split('_')[1])
-                if version > latest_version:
-                    latest_version = version
-        if latest_version != -1:
+
+    def get_latest_model(self) -> Tuple[CNNModel, int]:
+        model = CNNModel()
+        try:
+            versions = [int(file.split('.')[0].split('_')[1]) for file in os.listdir(self.model_dir) if file.startswith('model') and file.endswith('.pt')]
+            latest_version = max(versions)
             model_path = f'{self.model_dir}/model_{latest_version}.pt'
             model.load_state_dict(torch.load(model_path))
             print (f'[Manager]: load {model_path}')
+        except:
+            latest_version = -1
+        
         latest_version += 1
         return model, latest_version
 
-    def get_botzone_model(self, model_dir='/data'):
-        self.model_dir = model_dir
-        model = CNNModel()
-        latest_version = -1
-        for file in os.listdir(self.model_dir):
-            if 'model' in file:
-                version = int(file.split('.')[0].split('_')[1])
-                if version > latest_version:
-                    latest_version = version
-        if latest_version != -1:
-            model_path = f'{self.model_dir}/model_{latest_version}.pt'
-            model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-        else:
-            print("No Module!")  # botzone使用简单交互：异常可以print，正常不能print
-        return model
 
     def save(self, model, version):
         path = self.model_dir + f'/model_{version}.pt'

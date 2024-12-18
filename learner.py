@@ -25,8 +25,7 @@ class Learner(Process):
 
         # initialize model params
         device = torch.device(self.config['learner-device'])
-        # model = CNNModel(verbose = True)
-        model, version = self.manager.get_latest_model(verbose = True)
+        model, version = self.manager.get_latest_model()
         '''
         Support continuous trainining
         '''
@@ -43,8 +42,7 @@ class Learner(Process):
         while self.replay_buffer.size() < self.config['min_sample']:
             time.sleep(0.1)
 
-        cur_time = time.time()
-        iterations = 0
+        iterations = 1
         while True:
             # sample batch
             batch = self.replay_buffer.sample(self.config['batch_size'])
@@ -70,7 +68,8 @@ class Learner(Process):
                     action_dist = torch.distributions.Categorical(logits=logits)
                 except:
                     print ('error logits', logits)
-                    model, version = self.manager.get_latest_model(verbose = True)
+                    model, version = self.manager.get_latest_model()
+                    model = model.to(device)
                     continue
                 probs = F.softmax(logits, dim=1).gather(1, actions)
                 log_probs = torch.log(probs)

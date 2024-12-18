@@ -8,7 +8,7 @@ import pickle as pkl
 import math
 import random
 from bisect import bisect_right
-from model import ModelManager
+from .model import ModelManager
 import numpy as np
 from torch.utils.data import Dataset
 from collections import defaultdict
@@ -16,20 +16,23 @@ from collections import defaultdict
 
 class MahjongGBDataset(Dataset):
 
-    def __init__(self, indices, samples):
-        self.match_samples = samples
-        self.total_matches = len(self.match_samples)
-        self.total_samples = sum(self.match_samples)
+    def __init__(self, metas, winner_only = True):
+        self.metas = metas
+        if winner_only:
+            self.match_samples = [meta['winner_sample_num'] for meta in metas]
+        else:
+            self.match_samples = [meta['sample_num'] for meta in metas]
         self.matches = len(self.match_samples)
         self.samples = sum(self.match_samples)
-        self.indices = indices
+        self.winner_only = winner_only
+
         t = 0
         print (f'{self.matches} matches, {self.samples} samples')
         for i in range(self.matches):
             a = self.match_samples[i]
             self.match_samples[i] = t
             t += a
-        self.cache = {'obs': [None] * self.matches, 'mask': [None] * self.matches, 'act': [None] * self.matches}
+        self.cache = defaultdict(dict)
 
     def __len__(self):
         return self.samples
@@ -37,63 +40,44 @@ class MahjongGBDataset(Dataset):
     def __getitem__(self, index):
         match_id = bisect_right(self.match_samples, index, 0, self.matches) - 1
         sample_id = index - self.match_samples[match_id]
-        if self.cache['obs'][match_id] is None:
-            d = np.load(os.path.join('/root/jiaty/Mahjong-RL-botzone/framework/supervise_data', '%d.npz' % (self.indices[match_id])))
-            for k in d:
-                self.cache[k][match_id] = d[k]
+        if match_id not in self.cache['obs']:
+            d = np.load(self.metas[match_id]['file'])
+            self.cache['obs'][match_id] = (d['win_obs'] if self.winner_only else d['obs'])
+            self.cache['mask'][match_id] = (d['win_mask'] if self.winner_only else d['mask'])
+            self.cache['act'][match_id] = (d['win_act'] if self.winner_only else d['act'])
+            
+            #x_idx = list(range(self.cache['mask'][match_id].shape[0]))
+            #y_idx = list(self.cache['act'][match_id])
+            #assert np.all(self.cache['mask'][match_id][x_idx, y_idx]), 'invalid action detected!'
+            
         return self.cache['obs'][match_id][sample_id], self.cache['mask'][match_id][sample_id], \
-               self.cache['act'][match_id][sample_id]
+            self.cache['act'][match_id][sample_id]
 
 
 def prepare_dataset(datapath, train_ratio = 0.9, winner_only=False, shuffle=True):
     import json
-    train_indices = []
-    train_samples = []
-    validation_indices = []
-    validation_samples = []
     with open(os.path.join(datapath, 'meta.json')) as f:
         matches = json.load(f)
     if shuffle:
         random.shuffle(matches)
-    matches_train = matches[:int(len(matches)*train_ratio)]
-    matches_val = matches[int(len(matches)*train_ratio):]
-    data_train = defaultdict(list)
-    data_val = defaultdict(list)
     
-    for meta in matches_train:
-        d = np.load(meta['file'])
-        for k in d:
-            data_train[k].append(d[k][meta['winner']] if winner_only else )
-    for meta in matches_val:
-        d = np.load(meta['file'])
-        for k in d:
-            data_val[k].append(d[k])
-        
-    if winner_only:
-        
-        
-    
-    for idx, match in enumerate(matches):
-        if random.random() < train_ratio:
-            train_indices.append(i)
-            train_samples.append(sample)
-        else:
-            validation_indices.append(i)
-            validation_samples.append(sample)
+    train_matches = matches[:int(len(matches)*train_ratio)]
+    val_matches = matches[int(len(matches)*train_ratio):]
             
-    print (f'train: {len(train_indices)}, validation: {len(validation_indices)}')
-    return MahjongGBDataset(train_indices, train_samples), MahjongGBDataset(validation_indices, validation_samples)
+    print (f'train: {len(train_matches)}, validation: {len(val_matches)}')
+    return MahjongGBDataset(train_matches, winner_only=winner_only), MahjongGBDataset(val_matches, winner_only=winner_only)
 
 
 if __name__ == '__main__':
-    logdir = './model/'
-    model_dir = '/root/jiaty/Mahjong-RL-botzone/framework/model/checkpoint/'
+    logdir = '/home/jiaty/Mahjong-RL-botzone/Mahjong/model/'
+    model_dir = '/home/jiaty/Mahjong-RL-botzone/Mahjong/model/checkpoint1'
+    data_dir = '/data/jiaty/mahjong/supervise_data/'
     os.makedirs(model_dir, exist_ok=True)
 
     # Load dataset
     splitRatio = 0.9
     batchSize = 1024
-    trainDataset, validateDataset = train_validation_split('/root/jiaty/Mahjong-RL-botzone/framework/supervise_data', 0.9)
+    trainDataset, validateDataset = prepare_dataset(datapath=data_dir, train_ratio=0.9, winner_only=False)
     loader = DataLoader(dataset=trainDataset, batch_size=batchSize, shuffle=True)
     vloader = DataLoader(dataset=validateDataset, batch_size=batchSize, shuffle=False)
 
@@ -109,7 +93,7 @@ if __name__ == '__main__':
     accs = []
     validation_accs = []
     
-    for e in range(150):
+    for e in range(10):
         print('Epoch', e)
         manager.save(model, version)
         version += 1
@@ -118,7 +102,7 @@ if __name__ == '__main__':
             input_dict = {'is_training': True, 'observation': d[0].cuda(), 'action_mask': d[1].cuda()}
             logits, _ = model(input_dict)
             loss = F.cross_entropy(logits, d[2].long().cuda())
-            if loss > 1e10: continue
+            if math.isinf(loss): continue
             if i % 128 == 0:
                 print('Iteration %d/%d' % (i, len(trainDataset) // batchSize + 1), 'policy_loss', loss.item())
             optimizer.zero_grad()
@@ -143,7 +127,4 @@ if __name__ == '__main__':
         acc = correct / len(validateDataset)
         print('Epoch', e + 1, 'Validate acc:', acc)
         validation_accs.append(acc)
-        if (e + 1) % 10 == 0:
-            with open("acc.pkl", 'wb') as f:
-                pkl.dump({"train": accs, "validation": validation_accs}, f)
         

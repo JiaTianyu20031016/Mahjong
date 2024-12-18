@@ -123,8 +123,8 @@ def augment(data_path):
 
 
 if __name__ == '__main__':
-    raw_data_path = '/root/jiaty/Mahjong-RL-botzone/framework/raw_data'
-    data_path = '/root/jiaty/Mahjong-RL-botzone/framework/data'
+    raw_data_path = '/data/jiaty/mahjong/raw_data/'
+    data_path = '/data/jiaty/mahjong/data/'
     os.makedirs(data_path, exist_ok=True)
     reformat(raw_data_path, data_path)
     filter(data_path)   
